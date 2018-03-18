@@ -1,5 +1,7 @@
 module Lambda exposing (..)
 
+import Parser exposing ((|.), (|=), Parser)
+
 
 type Expression
     = Name Char
@@ -40,8 +42,8 @@ eval exp =
                     -- applicative order:
                     substitute (eval argExp) argName bodyExp
 
-                _ ->
-                    Debug.crash "Expression must have a fixed point"
+                (Application _ _) as app ->
+                    Application app (eval argExp)
 
 
 substitute : Expression -> Char -> Expression -> Expression
@@ -145,3 +147,83 @@ find pred list =
                 Just x
             else
                 find pred rest
+
+
+unwrap : b -> (a -> b) -> Maybe a -> b
+unwrap default f m =
+    case m of
+        Just x ->
+            f x
+
+        Nothing ->
+            default
+
+
+
+-- parser
+
+
+parse : Parser Expression
+parse =
+    Parser.succeed identity
+        |= parseExpression
+        |. Parser.end
+
+
+parseExpression : Parser Expression
+parseExpression =
+    Parser.lazy <|
+        \() ->
+            Parser.succeed
+                -- application is left-associative
+                (List.foldl (flip Application))
+                |= parseTerm
+                |= Parser.repeat Parser.zeroOrMore parseTerm
+
+
+parseTerm : Parser Expression
+parseTerm =
+    Parser.lazy <|
+        \() ->
+            Parser.oneOf
+                [ Parser.succeed identity
+                    |. Parser.symbol "("
+                    |= parseExpression
+                    |. Parser.symbol ")"
+                , parseName
+                , parseFunction
+                ]
+
+
+parseName : Parser Expression
+parseName =
+    Parser.map
+        Name
+        (parseChar isUnreserved)
+
+
+parseFunction : Parser Expression
+parseFunction =
+    Parser.lazy <|
+        \() ->
+            Parser.succeed
+                Function
+                |. Parser.symbol "\\"
+                |= parseChar isUnreserved
+                |. Parser.symbol "."
+                |= parseExpression
+
+
+parseChar : (Char -> Bool) -> Parser Char
+parseChar predicate =
+    Parser.map
+        (String.uncons >> unwrap '_' Tuple.first)
+        (Parser.keep (Parser.Exactly 1) predicate)
+
+
+isUnreserved : Char -> Bool
+isUnreserved char =
+    (char /= '(')
+        && (char /= ')')
+        && (char /= '\\')
+        && (char /= '.')
