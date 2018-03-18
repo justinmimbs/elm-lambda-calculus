@@ -26,19 +26,19 @@ eval exp =
         Name _ ->
             exp
 
-        Function a x ->
-            Function a (eval x)
+        Function argName bodyExp ->
+            Function argName (eval bodyExp)
 
-        Application x y ->
-            case eval x of
-                Name a ->
-                    Application (Name a) (eval y)
+        Application funcExp argExp ->
+            case eval funcExp of
+                Name name ->
+                    Application (Name name) (eval argExp)
 
-                Function a body ->
+                Function argName bodyExp ->
                     -- normal order:
-                    -- substitute y a body |> eval
+                    -- substitute argExp argName bodyExp |> eval
                     -- applicative order:
-                    substitute (eval y) a body
+                    substitute (eval argExp) argName bodyExp
 
                 _ ->
                     Debug.crash "Expression must have a fixed point"
@@ -145,26 +145,3 @@ find pred list =
                 Just x
             else
                 find pred rest
-
-
-
--- examples
-
-
-ex1 =
-    Application (Function 'x' (Name 'x')) (Name 'y')
-
-
-ex2 =
-    Application (Function 'x' (Application (Name 'x') (Name 'y'))) (Name 'y')
-
-
-ex3 =
-    Application (Function 'x' (Function 'y' (Application (Name 'x') (Name 'y')))) (Name 'y')
-
-
-ex4 =
-    -- (λx.(λy.x(λx.xy)))y
-    Application
-        (Function 'x' (Function 'y' (Application (Name 'x') (Function 'x' (Application (Name 'x') (Name 'y'))))))
-        (Name 'y')
