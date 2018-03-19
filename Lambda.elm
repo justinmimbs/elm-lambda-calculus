@@ -16,10 +16,41 @@ print exp =
             String.fromChar name
 
         Function argName bodyExp ->
-            "(λ" ++ String.fromChar argName ++ "." ++ print bodyExp ++ ")"
+            let
+                ( argNames, bodyExp2 ) =
+                    uncurryFunction [ argName ] bodyExp
+            in
+            "\\" ++ String.fromList argNames ++ "." ++ print bodyExp2
 
         Application funcExp argExp ->
-            print funcExp ++ print argExp
+            let
+                left =
+                    case funcExp of
+                        Function _ _ ->
+                            "(" ++ print funcExp ++ ")"
+
+                        _ ->
+                            print funcExp
+
+                right =
+                    case argExp of
+                        Name _ ->
+                            print argExp
+
+                        _ ->
+                            "(" ++ print argExp ++ ")"
+            in
+            left ++ right
+
+
+uncurryFunction : List Char -> Expression -> ( List Char, Expression )
+uncurryFunction argNames bodyExp =
+    case bodyExp of
+        Function argName nextBodyExp ->
+            uncurryFunction (argName :: argNames) nextBodyExp
+
+        _ ->
+            ( List.reverse argNames, bodyExp )
 
 
 eval : Expression -> Expression
@@ -114,7 +145,7 @@ rename newName targetName exp =
                 (argExp |> rename newName targetName)
 
 
-{-| Find all names that are not bound to an arg of a containing function.
+{-| Find all names that are not bound as function argument names.
 -}
 findFree : List Char -> List Char -> Expression -> List Char
 findFree bound free exp =
