@@ -1,0 +1,11 @@
+html { font-size: 20px; font-family: Fira Code, Menlo, Monaco, monospace; }
+body { margin: 2em; font: inherit; }
+
+textarea,
+input { display: block; width: 25em; height: 1em; padding: 0.5em 0.25em; margin-bottom: 1em; border-radius: 0.2em; font: inherit; border: 0; background-color: rgba(160, 160, 160, 0.15); }
+textarea:focus,
+input:focus { outline: none; background-color: rgba(160, 160, 160, 0.25); }
+
+textarea { height: 15em; resize: none; }
+
+.error { color: rgb(240, 0, 80); background-color: rgba(240, 0, 80, 0.05); }
