@@ -1,7 +1,7 @@
 module Tests exposing (..)
 
 import Expect
-import Lambda exposing (Expression(..))
+import Lambda exposing (Definition, Expression(..))
 import Parser
 import Test exposing (Test, describe, test)
 
@@ -129,3 +129,101 @@ test_parseExpression =
                 , Function 'x' (Function 'y' (Function 'z' (Name 'x')))
                 ]
         ]
+
+
+test_include : Test
+test_include =
+    describe "include"
+        [ describe "provides a list of definitions to an expression (as function arguments)"
+            [ test "in order" <|
+                \() ->
+                    Lambda.include
+                        [ ( 'A', Name 'a' )
+                        , ( 'B', Name 'b' )
+                        , ( 'C', Name 'c' )
+                        ]
+                        (Name 'x')
+                        |> Expect.equal
+                            (Application
+                                (Function 'A'
+                                    (Application
+                                        (Function 'B'
+                                            (Application
+                                                (Function 'C' (Name 'x'))
+                                                (Name 'c')
+                                            )
+                                        )
+                                        (Name 'b')
+                                    )
+                                )
+                                (Name 'a')
+                            )
+            ]
+        ]
+
+
+test_simplify : Test
+test_simplify =
+    let
+        toTest : ( List Definition, Expression, Expression ) -> Test
+        toTest ( defs, expression, expected ) =
+            test (Lambda.print expression) <|
+                \() ->
+                    Lambda.simplify defs expression |> Expect.equal expected
+    in
+    describe "simplify" <|
+        List.map toTest
+            [ ( [ ( 'I', Function 'x' (Name 'x') )
+                ]
+              , Function 'x' (Name 'x')
+              , Name 'I'
+              )
+            , ( [ ( 'I', Function 'x' (Name 'x') )
+                ]
+              , Application (Function 'x' (Name 'x')) (Name 'x')
+              , Application (Name 'I') (Name 'x')
+              )
+            , ( [ ( 'I', Function 'x' (Name 'x') )
+                , ( 'T', Function 'x' (Function 'y' (Name 'x')) )
+                , ( 'F', Function 'x' (Function 'y' (Name 'y')) )
+                ]
+              , Application
+                    (Application
+                        (Function 'x' (Name 'x'))
+                        (Function 'x' (Function 'y' (Name 'x')))
+                    )
+                    (Function 'x' (Function 'y' (Name 'y')))
+              , Application (Application (Name 'I') (Name 'T')) (Name 'F')
+              )
+            ]
+
+
+test_parseDefinition : Test
+test_parseDefinition =
+    let
+        toTest : Definition -> List Test
+        toTest (( name, expression ) as definition) =
+            let
+                spaces =
+                    String.cons name (" = " ++ Lambda.print expression)
+
+                noSpaces =
+                    String.cons name ("=" ++ Lambda.print expression)
+            in
+            [ test spaces <|
+                \() ->
+                    spaces |> Parser.run Lambda.parseDefinition |> Expect.equal (Ok definition)
+            , test noSpaces <|
+                \() ->
+                    noSpaces |> Parser.run Lambda.parseDefinition |> Expect.equal (Ok definition)
+            ]
+    in
+    describe "parseDefinition" <|
+        List.concatMap toTest
+            [ ( 'I'
+              , Function 'x' (Name 'x')
+              )
+            , ( 'S'
+              , Function 'w' (Function 'y' (Function 'x' (Application (Name 'y') (Application (Application (Name 'w') (Name 'y')) (Name 'x')))))
+              )
+            ]

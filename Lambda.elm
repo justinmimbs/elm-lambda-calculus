@@ -1,9 +1,13 @@
 module Lambda
     exposing
-        ( Expression(..)
+        ( Definition
+        , Expression(..)
         , eval
+        , include
+        , parseDefinition
         , parseExpression
         , print
+        , simplify
         )
 
 import Parser exposing ((|.), (|=), Parser)
@@ -197,7 +201,7 @@ unwrap default f m =
 
 
 
--- parser
+-- parseExpression
 
 
 parseExpression : Parser Expression
@@ -267,3 +271,65 @@ isUnreserved char =
         && (char /= ')')
         && (char /= '\\')
         && (char /= '.')
+
+
+
+-- Definition
+
+
+type alias Definition =
+    ( Char, Expression )
+
+
+include : List Definition -> Expression -> Expression
+include defs =
+    includeHelp (List.reverse defs)
+
+
+includeHelp : List Definition -> Expression -> Expression
+includeHelp defs exp =
+    case defs of
+        ( argName, argExp ) :: rest ->
+            includeHelp rest (Application (Function argName exp) argExp)
+
+        [] ->
+            exp
+
+
+simplify : List Definition -> Expression -> Expression
+simplify defs exp =
+    case find (Tuple.second >> (==) exp) defs of
+        Just ( name, _ ) ->
+            Name name
+
+        Nothing ->
+            case exp of
+                Application funcExp argExp ->
+                    Application (simplify defs funcExp) (simplify defs argExp)
+
+                _ ->
+                    exp
+
+
+
+-- parseDefinition
+
+
+parseDefinition : Parser Definition
+parseDefinition =
+    Parser.succeed (,)
+        |= parseChar isUnreserved
+        |. spaceAllowed
+        |. Parser.symbol "="
+        |. spaceAllowed
+        |= parseExpression
+
+
+spaceAllowed : Parser ()
+spaceAllowed =
+    Parser.ignore Parser.zeroOrMore isSpace
+
+
+isSpace : Char -> Bool
+isSpace =
+    (==) ' '
