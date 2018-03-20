@@ -2,6 +2,7 @@ module Tests exposing (..)
 
 import Expect
 import Lambda exposing (Expression(..))
+import Parser
 import Test exposing (Test, describe, test)
 
 
@@ -94,5 +95,37 @@ test_print =
                 , ( Function 'x' (Function 'y' (Function 'z' (Name 'x')))
                   , "\\xyz.x"
                   )
+                ]
+        ]
+
+
+test_parseExpression : Test
+test_parseExpression =
+    let
+        toTest : Expression -> Test
+        toTest expression =
+            test (expression |> Lambda.print) <|
+                \() ->
+                    expression |> Lambda.print |> Parser.run Lambda.parseExpression |> Expect.equal (Ok expression)
+    in
+    describe "parseExpression"
+        [ describe "converts a printed Expression back to its original form" <|
+            List.map toTest
+                [ Name 'x'
+                , Function 'x' (Name 'x')
+                , Function 'x' (Application (Name 'x') (Name 'y'))
+                , Application (Function 'x' (Name 'x')) (Name 'y')
+                , Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y'))
+                , Application (Name 'x') (Function 'y' (Name 'y'))
+                , Application (Application (Application (Name 'a') (Name 'b')) (Name 'c')) (Name 'd')
+                , Application (Name 'a') (Application (Name 'b') (Application (Name 'c') (Name 'd')))
+                , Application
+                    (Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y')))
+                    (Name 'z')
+                , Application
+                    (Function 'x' (Name 'x'))
+                    (Application (Function 'y' (Name 'y')) (Name 'z'))
+                , Function 'x' (Function 'y' (Name 'x'))
+                , Function 'x' (Function 'y' (Function 'z' (Name 'x')))
                 ]
         ]

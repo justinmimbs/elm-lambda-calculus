@@ -1,4 +1,10 @@
-module Lambda exposing (..)
+module Lambda
+    exposing
+        ( Expression(..)
+        , eval
+        , parseExpression
+        , print
+        )
 
 import Parser exposing ((|.), (|=), Parser)
 
@@ -71,7 +77,7 @@ eval exp =
                     -- normal order:
                     -- substitute argExp argName bodyExp |> eval
                     -- applicative order:
-                    substitute (eval argExp) argName bodyExp
+                    substitute (eval argExp) argName bodyExp |> eval
 
                 (Application _ _) as app ->
                     Application app (eval argExp)
@@ -194,13 +200,6 @@ unwrap default f m =
 -- parser
 
 
-parse : Parser Expression
-parse =
-    Parser.succeed identity
-        |= parseExpression
-        |. Parser.end
-
-
 parseExpression : Parser Expression
 parseExpression =
     Parser.lazy <|
@@ -238,11 +237,21 @@ parseFunction =
     Parser.lazy <|
         \() ->
             Parser.succeed
-                Function
+                curryFunction
                 |. Parser.symbol "\\"
-                |= parseChar isUnreserved
+                |= Parser.repeat Parser.oneOrMore (parseChar isUnreserved)
                 |. Parser.symbol "."
                 |= parseExpression
+
+
+curryFunction : List Char -> Expression -> Expression
+curryFunction argNames bodyExp =
+    case argNames of
+        argName :: rest ->
+            Function argName (curryFunction rest bodyExp)
+
+        [] ->
+            bodyExp
 
 
 parseChar : (Char -> Bool) -> Parser Char
