@@ -6,6 +6,18 @@ import Parser
 import Test exposing (Test, describe, test)
 
 
+fn =
+    Function
+
+
+ap =
+    Application
+
+
+n =
+    Name
+
+
 test_eval : Test
 test_eval =
     describe "eval" <|
@@ -15,16 +27,16 @@ test_eval =
                     \() ->
                         expression |> Lambda.eval |> Expect.equal expected
             )
-            [ ( Application (Function 'x' (Name 'x')) (Name 'y')
-              , Name 'y'
+            [ ( ap (fn 'x' (n 'x')) (n 'y')
+              , n 'y'
               )
-            , ( Application (Function 'x' (Function 'y' (Application (Name 'x') (Name 'y')))) (Name 'y')
-              , Function 'a' (Application (Name 'y') (Name 'a'))
+            , ( ap (fn 'x' (fn 'y' (ap (n 'x') (n 'y')))) (n 'y')
+              , fn 'a' (ap (n 'y') (n 'a'))
               )
-            , ( Application
-                    (Function 'x' (Function 'y' (Application (Name 'x') (Function 'x' (Application (Name 'x') (Name 'y'))))))
-                    (Name 'y')
-              , Function 'a' (Application (Name 'y') (Function 'x' (Application (Name 'x') (Name 'a'))))
+            , ( ap
+                    (fn 'x' (fn 'y' (ap (n 'x') (fn 'x' (ap (n 'x') (n 'y'))))))
+                    (n 'y')
+              , fn 'a' (ap (n 'y') (fn 'x' (ap (n 'x') (n 'a'))))
               )
             ]
 
@@ -41,58 +53,58 @@ test_print =
     describe "print" <|
         [ describe "prints names and functions" <|
             List.map toTest
-                [ ( Name 'x'
+                [ ( n 'x'
                   , "x"
                   )
-                , ( Function 'x' (Name 'x')
+                , ( fn 'x' (n 'x')
                   , "\\x.x"
                   )
                 ]
         , describe "uses parentheses to disambiguate" <|
             [ describe "function application" <|
                 List.map toTest
-                    [ ( Function 'x' (Application (Name 'x') (Name 'y'))
+                    [ ( fn 'x' (ap (n 'x') (n 'y'))
                       , "\\x.xy"
                       )
-                    , ( Application (Function 'x' (Name 'x')) (Name 'y')
+                    , ( ap (fn 'x' (n 'x')) (n 'y')
                       , "(\\x.x)y"
                       )
-                    , ( Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y'))
+                    , ( ap (fn 'x' (n 'x')) (fn 'y' (n 'y'))
                       , "(\\x.x)(\\y.y)"
                       )
-                    , ( Application (Name 'x') (Function 'y' (Name 'y'))
+                    , ( ap (n 'x') (fn 'y' (n 'y'))
                       , "x(\\y.y)"
                       )
                     ]
             , describe "right-nested application" <|
                 List.map toTest
-                    [ ( Application (Application (Application (Name 'a') (Name 'b')) (Name 'c')) (Name 'd')
+                    [ ( ap (ap (ap (n 'a') (n 'b')) (n 'c')) (n 'd')
                       , "abcd"
                       )
-                    , ( Application (Name 'a') (Application (Name 'b') (Application (Name 'c') (Name 'd')))
+                    , ( ap (n 'a') (ap (n 'b') (ap (n 'c') (n 'd')))
                       , "a(b(cd))"
                       )
                     ]
             , describe "right-nested function application" <|
                 List.map toTest
-                    [ ( Application
-                            (Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y')))
-                            (Name 'z')
+                    [ ( ap
+                            (ap (fn 'x' (n 'x')) (fn 'y' (n 'y')))
+                            (n 'z')
                       , "(\\x.x)(\\y.y)z"
                       )
-                    , ( Application
-                            (Function 'x' (Name 'x'))
-                            (Application (Function 'y' (Name 'y')) (Name 'z'))
+                    , ( ap
+                            (fn 'x' (n 'x'))
+                            (ap (fn 'y' (n 'y')) (n 'z'))
                       , "(\\x.x)((\\y.y)z)"
                       )
                     ]
             ]
         , describe "abbreviates a sequence of functions as a single 'multi-argument' function" <|
             List.map toTest
-                [ ( Function 'x' (Function 'y' (Name 'x'))
+                [ ( fn 'x' (fn 'y' (n 'x'))
                   , "\\xy.x"
                   )
-                , ( Function 'x' (Function 'y' (Function 'z' (Name 'x')))
+                , ( fn 'x' (fn 'y' (fn 'z' (n 'x')))
                   , "\\xyz.x"
                   )
                 ]
@@ -111,22 +123,22 @@ test_parseExpression =
     describe "parseExpression"
         [ describe "converts a printed Expression back to its original form" <|
             List.map toTest
-                [ Name 'x'
-                , Function 'x' (Name 'x')
-                , Function 'x' (Application (Name 'x') (Name 'y'))
-                , Application (Function 'x' (Name 'x')) (Name 'y')
-                , Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y'))
-                , Application (Name 'x') (Function 'y' (Name 'y'))
-                , Application (Application (Application (Name 'a') (Name 'b')) (Name 'c')) (Name 'd')
-                , Application (Name 'a') (Application (Name 'b') (Application (Name 'c') (Name 'd')))
-                , Application
-                    (Application (Function 'x' (Name 'x')) (Function 'y' (Name 'y')))
-                    (Name 'z')
-                , Application
-                    (Function 'x' (Name 'x'))
-                    (Application (Function 'y' (Name 'y')) (Name 'z'))
-                , Function 'x' (Function 'y' (Name 'x'))
-                , Function 'x' (Function 'y' (Function 'z' (Name 'x')))
+                [ n 'x'
+                , fn 'x' (n 'x')
+                , fn 'x' (ap (n 'x') (n 'y'))
+                , ap (fn 'x' (n 'x')) (n 'y')
+                , ap (fn 'x' (n 'x')) (fn 'y' (n 'y'))
+                , ap (n 'x') (fn 'y' (n 'y'))
+                , ap (ap (ap (n 'a') (n 'b')) (n 'c')) (n 'd')
+                , ap (n 'a') (ap (n 'b') (ap (n 'c') (n 'd')))
+                , ap
+                    (ap (fn 'x' (n 'x')) (fn 'y' (n 'y')))
+                    (n 'z')
+                , ap
+                    (fn 'x' (n 'x'))
+                    (ap (fn 'y' (n 'y')) (n 'z'))
+                , fn 'x' (fn 'y' (n 'x'))
+                , fn 'x' (fn 'y' (fn 'z' (n 'x')))
                 ]
         ]
 
@@ -138,25 +150,25 @@ test_include =
             [ test "in order" <|
                 \() ->
                     Lambda.include
-                        [ ( 'A', Name 'a' )
-                        , ( 'B', Name 'b' )
-                        , ( 'C', Name 'c' )
+                        [ ( 'A', n 'a' )
+                        , ( 'B', n 'b' )
+                        , ( 'C', n 'c' )
                         ]
-                        (Name 'x')
+                        (n 'x')
                         |> Expect.equal
-                            (Application
-                                (Function 'A'
-                                    (Application
-                                        (Function 'B'
-                                            (Application
-                                                (Function 'C' (Name 'x'))
-                                                (Name 'c')
+                            (ap
+                                (fn 'A'
+                                    (ap
+                                        (fn 'B'
+                                            (ap
+                                                (fn 'C' (n 'x'))
+                                                (n 'c')
                                             )
                                         )
-                                        (Name 'b')
+                                        (n 'b')
                                     )
                                 )
-                                (Name 'a')
+                                (n 'a')
                             )
             ]
         ]
@@ -173,27 +185,22 @@ test_simplify =
     in
     describe "simplify" <|
         List.map toTest
-            [ ( [ ( 'I', Function 'x' (Name 'x') )
+            [ ( [ ( 'I', fn 'x' (n 'x') )
                 ]
-              , Function 'x' (Name 'x')
-              , Name 'I'
+              , fn 'x' (n 'x')
+              , n 'I'
               )
-            , ( [ ( 'I', Function 'x' (Name 'x') )
+            , ( [ ( 'I', fn 'x' (n 'x') )
                 ]
-              , Application (Function 'x' (Name 'x')) (Name 'x')
-              , Application (Name 'I') (Name 'x')
+              , ap (fn 'x' (n 'x')) (n 'x')
+              , ap (n 'I') (n 'x')
               )
-            , ( [ ( 'I', Function 'x' (Name 'x') )
-                , ( 'T', Function 'x' (Function 'y' (Name 'x')) )
-                , ( 'F', Function 'x' (Function 'y' (Name 'y')) )
+            , ( [ ( 'I', fn 'x' (n 'x') )
+                , ( 'T', fn 'x' (fn 'y' (n 'x')) )
+                , ( 'F', fn 'x' (fn 'y' (n 'y')) )
                 ]
-              , Application
-                    (Application
-                        (Function 'x' (Name 'x'))
-                        (Function 'x' (Function 'y' (Name 'x')))
-                    )
-                    (Function 'x' (Function 'y' (Name 'y')))
-              , Application (Application (Name 'I') (Name 'T')) (Name 'F')
+              , ap (ap (fn 'x' (n 'x')) (fn 'x' (fn 'y' (n 'x')))) (fn 'x' (fn 'y' (n 'y')))
+              , ap (ap (n 'I') (n 'T')) (n 'F')
               )
             ]
 
@@ -221,9 +228,73 @@ test_parseDefinition =
     describe "parseDefinition" <|
         List.concatMap toTest
             [ ( 'I'
-              , Function 'x' (Name 'x')
+              , fn 'x' (n 'x')
               )
             , ( 'S'
-              , Function 'w' (Function 'y' (Function 'x' (Application (Name 'y') (Application (Application (Name 'w') (Name 'y')) (Name 'x')))))
+              , fn 'w' (fn 'y' (fn 'x' (ap (n 'y') (ap (ap (n 'w') (n 'y')) (n 'x')))))
               )
             ]
+
+
+test_equivalent : Test
+test_equivalent =
+    let
+        toTest : Bool -> ( Expression, Expression ) -> Test
+        toTest expected ( x, y ) =
+            commutative (Lambda.print x ++ " ≡ " ++ Lambda.print y) Lambda.equivalent x y expected
+    in
+    describe "equivalent"
+        [ describe "returns True when expressions have the same structure and a correspondence exists between names in the same scope" <|
+            List.map (toTest True)
+                [ ( n 'x'
+                  , n 'x'
+                  )
+                , ( n 'x'
+                  , n 'y'
+                  )
+                , ( ap (n 'x') (n 'y')
+                  , ap (n 'y') (n 'x')
+                  )
+                , ( fn 'x' (fn 'x' (n 'x'))
+                  , fn 'x' (fn 'y' (n 'y'))
+                  )
+                , ( fn 'x' (ap (n 'x') (fn 'x' (n 'x')))
+                  , fn 'y' (ap (n 'y') (fn 'z' (n 'z')))
+                  )
+                ]
+        , describe "returns False when expressions have different structures" <|
+            List.map (toTest False)
+                [ ( n 'x'
+                  , fn 'x' (n 'x')
+                  )
+                , ( fn 'x' (n 'x')
+                  , ap (n 'x') (n 'x')
+                  )
+                , ( ap (n 'x') (n 'x')
+                  , n 'x'
+                  )
+                ]
+        , describe "returns False when expressions have the same structure but no correspondence exists between names in the same scope" <|
+            List.map (toTest False)
+                [ ( ap (n 'x') (n 'x')
+                  , ap (n 'x') (n 'y')
+                  )
+                , ( ap (ap (n 'x') (n 'y')) (ap (n 'x') (n 'y'))
+                  , ap (ap (n 'x') (n 'y')) (ap (n 'x') (n 'z'))
+                  )
+                , ( fn 'x' (fn 'x' (n 'y'))
+                  , fn 'x' (fn 'y' (n 'x'))
+                  )
+                , ( fn 'x' (ap (n 'x') (fn 'x' (n 'z')))
+                  , fn 'y' (ap (n 'y') (fn 'z' (n 'z')))
+                  )
+                ]
+        ]
+
+
+commutative : String -> (a -> a -> b) -> a -> a -> b -> Test
+commutative description f x y expected =
+    describe description
+        [ test "x y" <| \() -> f x y |> Expect.equal expected
+        , test "y x" <| \() -> f y x |> Expect.equal expected
+        ]

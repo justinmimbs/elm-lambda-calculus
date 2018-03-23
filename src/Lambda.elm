@@ -2,6 +2,7 @@ module Lambda
     exposing
         ( Definition
         , Expression(..)
+        , equivalent
         , eval
         , include
         , parseDefinition
@@ -10,7 +11,9 @@ module Lambda
         , simplify
         )
 
+import Dict exposing (Dict)
 import Parser exposing ((|.), (|=), Parser)
+import Set exposing (Set)
 
 
 type Expression
@@ -174,33 +177,6 @@ findFree bound free exp =
 
 
 
--- helpers
-
-
-find : (a -> Bool) -> List a -> Maybe a
-find pred list =
-    case list of
-        [] ->
-            Nothing
-
-        x :: rest ->
-            if pred x then
-                Just x
-            else
-                find pred rest
-
-
-unwrap : b -> (a -> b) -> Maybe a -> b
-unwrap default f m =
-    case m of
-        Just x ->
-            f x
-
-        Nothing ->
-            default
-
-
-
 -- parseExpression
 
 
@@ -298,7 +274,7 @@ includeHelp defs exp =
 
 simplify : List Definition -> Expression -> Expression
 simplify defs exp =
-    case find (Tuple.second >> (==) exp) defs of
+    case find (Tuple.second >> equivalent exp) defs of
         Just ( name, _ ) ->
             Name name
 
@@ -333,3 +309,116 @@ spaceAllowed =
 isSpace : Char -> Bool
 isSpace =
     (==) ' '
+
+
+
+-- equivalence
+
+
+equivalent : Expression -> Expression -> Bool
+equivalent a b =
+    emptyRelation |> findCorrespondence a b |> isJust
+
+
+{-| Attempt to find a correspondence between the same-scoped names of two
+expressions with the same structure. Because of name masking, the resulting
+relation can be partial; so while not useful itself, its presence indicates
+that a correspondence exists.
+-}
+findCorrespondence : Expression -> Expression -> Relation -> Maybe Relation
+findCorrespondence a b rel =
+    case ( a, b ) of
+        ( Name nameA, Name nameB ) ->
+            rel
+                |> extendRelation nameA nameB
+
+        ( Function argNameA bodyExpA, Function argNameB bodyExpB ) ->
+            rel
+                |> replaceRelation argNameA argNameB
+                |> findCorrespondence bodyExpA bodyExpB
+
+        ( Application funcExpA argExpA, Application funcExpB argExpB ) ->
+            rel
+                |> findCorrespondence funcExpA funcExpB
+                |> Maybe.andThen (findCorrespondence argExpA argExpB)
+
+        _ ->
+            Nothing
+
+
+{-| Represents a binary relation, where `extend` and `replace` maintain a
+partial bijection.
+-}
+type alias Relation =
+    { left : Set Char
+    , right : Set Char
+    , pairs : Dict Char Char
+    }
+
+
+emptyRelation : Relation
+emptyRelation =
+    Relation Set.empty Set.empty Dict.empty
+
+
+extendRelation : Char -> Char -> Relation -> Maybe Relation
+extendRelation l r ({ left, right, pairs } as rel) =
+    if (pairs |> Dict.get l) == Just r then
+        Just rel
+    else if not (Set.member l left) && not (Set.member r right) then
+        Just (rel |> replaceRelation l r)
+    else
+        Nothing
+
+
+replaceRelation : Char -> Char -> Relation -> Relation
+replaceRelation l r { left, right, pairs } =
+    Relation
+        (left |> Set.insert l)
+        (right |> Set.insert r)
+        (pairs |> removeByValue r |> Dict.insert l r)
+
+
+
+-- helpers
+
+
+find : (a -> Bool) -> List a -> Maybe a
+find pred list =
+    case list of
+        [] ->
+            Nothing
+
+        x :: rest ->
+            if pred x then
+                Just x
+            else
+                find pred rest
+
+
+unwrap : b -> (a -> b) -> Maybe a -> b
+unwrap default f m =
+    case m of
+        Just x ->
+            f x
+
+        Nothing ->
+            default
+
+
+removeByValue : v -> Dict comparable v -> Dict comparable v
+removeByValue val dict =
+    dict
+        |> Dict.toList
+        |> find (Tuple.second >> (==) val)
+        |> unwrap dict (\( key, _ ) -> Dict.remove key dict)
+
+
+isJust : Maybe a -> Bool
+isJust m =
+    case m of
+        Just _ ->
+            True
+
+        Nothing ->
+            False
