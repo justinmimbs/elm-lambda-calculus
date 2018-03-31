@@ -247,6 +247,8 @@ isUnreserved char =
         && (char /= ')')
         && (char /= '\\')
         && (char /= '.')
+        && (char /= ' ')
+        && (char /= '=')
 
 
 
@@ -294,9 +296,12 @@ simplify defs exp =
 parseDefinition : Parser Definition
 parseDefinition =
     Parser.succeed (,)
-        |= parseChar isUnreserved
-        |. spaceAllowed
-        |. Parser.symbol "="
+        |= Parser.delayedCommitMap always
+            (Parser.succeed identity
+                |= parseChar isUnreserved
+                |. spaceAllowed
+            )
+            (Parser.symbol "=")
         |. spaceAllowed
         |= parseExpression
 

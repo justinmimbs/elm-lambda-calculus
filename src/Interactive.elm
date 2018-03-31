@@ -46,15 +46,10 @@ parseInputLine : Parser InputLine
 parseInputLine =
     Parser.succeed identity
         |= Parser.oneOf
-            [ Parser.map Def Lambda.parseDefinition |> try
+            [ Parser.map Def Lambda.parseDefinition
             , Parser.map Exp Lambda.parseExpression
             ]
         |. Parser.end
-
-
-try : Parser a -> Parser a
-try p =
-    Parser.delayedCommitMap always p (Parser.succeed ())
 
 
 type OutputLine
@@ -91,7 +86,25 @@ viewOutputLine line =
             Html.div [] []
 
         Error error ->
-            Html.div [ Html.Attributes.class "error" ] [ Html.text (toString error.problem) ]
+            let
+                message =
+                    case error.problem of
+                        Parser.ExpectingSymbol s ->
+                            "Expecting \"" ++ s ++ "\""
+
+                        Parser.ExpectingEnd ->
+                            "Expecting end, not \"" ++ String.dropLeft (error.col - 1) error.source ++ "\""
+
+                        Parser.BadRepeat ->
+                            "Expecting a name"
+
+                        Parser.BadOneOf _ ->
+                            "Expecting an expression"
+
+                        _ ->
+                            toString error.problem
+            in
+            Html.div [ Html.Attributes.class "error" ] [ Html.text message ]
 
         DefLine exp ->
             Html.div [ Html.Attributes.class "dim" ] [ Html.text (exp |> Lambda.print) ]
@@ -131,13 +144,3 @@ view string =
             [ Html.Attributes.class "output" ]
             (outputLines |> List.map viewOutputLine)
         ]
-
-
-unwrap : (x -> b) -> (a -> b) -> Result x a -> b
-unwrap fromErr fromOk result =
-    case result of
-        Err x ->
-            fromErr x
-
-        Ok a ->
-            fromOk a
