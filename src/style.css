@@ -1,11 +1,21 @@
-html { font-size: 20px; font-family: Fira Code, Menlo, Monaco, monospace; }
-body { margin: 2em; font: inherit; }
+body { margin: 2em; display: flex; justify-content: center; }
 
-textarea,
-input { display: block; width: 25em; height: 1em; padding: 0.5em 0.25em; margin-bottom: 1em; border-radius: 0.2em; font: inherit; border: 0; background-color: rgba(160, 160, 160, 0.15); }
-textarea:focus,
-input:focus { outline: none; background-color: rgba(160, 160, 160, 0.25); }
+.sheet { font-size: 20px; width: 40em; display: flex; background-color: rgba(160, 160, 160, 0.15);  font-family: Fira Code, Menlo, Monaco, monospace; line-height: 1.5em; }
 
-textarea { height: 15em; resize: none; }
+.sheet textarea { display: block; font: inherit; border: 0; background: transparent; height: inherit; resize: none; }
+.sheet textarea:focus{ outline: none; }
+
+.margin { color: rgb(180, 180, 180); }
+.margin > div { height: 1.5em;  text-align: right; }
+
+.output { background: rgba(160, 160, 160, 0.1); }
+.output > div { height: 1.5em; }
+
+.input,
+.output { width: 50%; white-space: nowrap; overflow-x: auto; overflow-y: hidden; padding: 0.25em 0; }
+
+.margin,
+.output { padding: 0.25em 1em 1.5em; }
 
 .error { color: rgb(240, 0, 80); background-color: rgba(240, 0, 80, 0.05); }
+.dim { color: rgb(140, 140, 140); }

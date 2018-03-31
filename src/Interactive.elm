@@ -3,106 +3,134 @@ module Interactive exposing (main)
 import Html exposing (Html)
 import Html.Attributes
 import Html.Events
-import Lambda exposing (Expression)
+import Lambda exposing (Definition, Expression)
 import Parser exposing ((|.), (|=), Parser)
 
 
-main : Program Never Model Msg
+main : Program Never String String
 main =
     Html.beginnerProgram
-        { model = defaultModel
-        , view = view
-        , update = update
+        { model =
+            [ "S = \\nsz.s(nsz)"
+            , "0 = \\sz.z"
+            , "1 = S0"
+            , "2 = S1"
+            , "3 = S2"
+            , "4 = S3"
+            , "5 = S4"
+            , "6 = S5"
+            , "+ = \\xy.xSy"
+            , "* = \\xys.x(ys)"
+            , ""
+            , "3S"
+            , "*2(+21)"
+            ]
+                |> String.join "\n"
+        , view =
+            \string ->
+                Html.div
+                    []
+                    [ Html.node "style" [] [ Html.text "@import url(./style.css);" ]
+                    , view string
+                    ]
+        , update = always
         }
 
 
-defaultModel : Model
-defaultModel =
-    Model
-        """S = \\nsz.s(nsz)
-0 = \\sz.z
-1 = \\sz.sz
-2 = \\sz.s(sz)
-3 = \\sz.s(s(sz))
-6 = \\sz.s(s(s(s(s(sz)))))
-+ = \\xy.xSy
-* = \\xys.x(ys)
-"""
-        "*2(+21)"
+type InputLine
+    = Def Definition
+    | Exp Expression
 
 
-type alias Model =
-    { definitions : String
-    , expression : String
-    }
+parseInputLine : Parser InputLine
+parseInputLine =
+    Parser.succeed identity
+        |= Parser.oneOf
+            [ Parser.map Def Lambda.parseDefinition |> try
+            , Parser.map Exp Lambda.parseExpression
+            ]
+        |. Parser.end
 
 
-type Msg
-    = UpdateDefinitions String
-    | UpdateExpression String
+try : Parser a -> Parser a
+try p =
+    Parser.delayedCommitMap always p (Parser.succeed ())
 
 
-update : Msg -> Model -> Model
-update msg model =
-    case msg of
-        UpdateDefinitions s ->
-            { model | definitions = s }
-
-        UpdateExpression s ->
-            { model | expression = s }
+type OutputLine
+    = Blank
+    | Error Parser.Error
+    | DefLine Expression
+    | ExpLine Expression
 
 
-view : Model -> Html Msg
-view { definitions, expression } =
+accumulateLine : String -> ( List Definition, List OutputLine ) -> ( List Definition, List OutputLine )
+accumulateLine line ( defs, output ) =
+    if line == "" then
+        ( defs, Blank :: output )
+    else
+        case Parser.run parseInputLine line of
+            Err error ->
+                ( defs, Error error :: output )
+
+            Ok (Def ( name, exp )) ->
+                let
+                    evaluated =
+                        exp |> Lambda.include defs |> Lambda.eval
+                in
+                ( ( name, evaluated ) :: defs, DefLine evaluated :: output )
+
+            Ok (Exp exp) ->
+                ( defs, ExpLine (exp |> Lambda.include defs |> Lambda.eval |> Lambda.simplify defs) :: output )
+
+
+viewOutputLine : OutputLine -> Html a
+viewOutputLine line =
+    case line of
+        Blank ->
+            Html.div [] []
+
+        Error error ->
+            Html.div [ Html.Attributes.class "error" ] [ Html.text (toString error.problem) ]
+
+        DefLine exp ->
+            Html.div [ Html.Attributes.class "dim" ] [ Html.text (exp |> Lambda.print) ]
+
+        ExpLine exp ->
+            Html.div [] [ Html.text (exp |> Lambda.print) ]
+
+
+view : String -> Html String
+view string =
     let
-        definitionList =
-            definitions
+        outputLines =
+            string
                 |> String.lines
-                |> List.filterMap
-                    (Parser.run (Parser.map2 always Lambda.parseDefinition Parser.end) >> Result.toMaybe)
-
-        expressionResult =
-            expression
-                |> Parser.run (Parser.map2 always Lambda.parseExpression Parser.end)
-                |> Result.map (Lambda.include definitionList >> Lambda.eval >> Lambda.simplify definitionList)
+                |> List.foldl accumulateLine ( [], [] )
+                |> Tuple.second
+                |> List.reverse
     in
     Html.div
-        []
-        [ Html.node "style" [] [ Html.text "@import url(./style.css);" ]
+        [ Html.Attributes.class "sheet"
+        ]
+        [ Html.div
+            [ Html.Attributes.class "margin" ]
+            (outputLines
+                |> List.length
+                |> List.range 1
+                |> List.map (\n -> Html.div [] [ Html.text (toString n) ])
+            )
         , Html.textarea
-            [ Html.Attributes.value definitions
-            , Html.Events.onInput UpdateDefinitions
+            [ Html.Attributes.class "input"
+            , Html.Attributes.value string
             , Html.Attributes.spellcheck False
-            ]
-            []
-        , Html.input
-            [ Html.Attributes.value expression
-            , Html.Events.onInput UpdateExpression
-            , Html.Attributes.spellcheck False
-            , Html.Attributes.classList
-                [ ( "error", expressionResult |> isErr )
-                ]
+            , Html.Events.onInput identity
             ]
             []
         , Html.div
-            []
-            [ Html.text (expressionResult |> unwrap toString Lambda.print)
-            ]
+            [ Html.Attributes.class "output" ]
+            (outputLines |> List.map viewOutputLine)
         ]
-
-
-
--- result
-
-
-isErr : Result x a -> Bool
-isErr result =
-    case result of
-        Err _ ->
-            True
-
-        Ok _ ->
-            False
 
 
 unwrap : (x -> b) -> (a -> b) -> Result x a -> b
