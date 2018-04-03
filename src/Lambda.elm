@@ -81,10 +81,8 @@ eval exp =
                     Application (Name name) (eval argExp)
 
                 Function argName bodyExp ->
-                    -- normal order:
-                    -- substitute argExp argName bodyExp |> eval
-                    -- applicative order:
-                    substitute (eval argExp) argName bodyExp |> eval
+                    -- normal order
+                    substitute argExp argName bodyExp |> eval
 
                 (Application _ _) as app ->
                     Application app (eval argExp)

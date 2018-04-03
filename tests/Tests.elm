@@ -20,25 +20,37 @@ n =
 
 test_eval : Test
 test_eval =
-    describe "eval" <|
-        List.map
-            (\( expression, expected ) ->
-                test (Lambda.print expression) <|
-                    \() ->
-                        expression |> Lambda.eval |> Expect.equal expected
-            )
-            [ ( ap (fn 'x' (n 'x')) (n 'y')
-              , n 'y'
-              )
-            , ( ap (fn 'x' (fn 'y' (ap (n 'x') (n 'y')))) (n 'y')
-              , fn 'a' (ap (n 'y') (n 'a'))
-              )
-            , ( ap
-                    (fn 'x' (fn 'y' (ap (n 'x') (fn 'x' (ap (n 'x') (n 'y'))))))
-                    (n 'y')
-              , fn 'a' (ap (n 'y') (fn 'x' (ap (n 'x') (n 'a'))))
-              )
-            ]
+    let
+        toTest : ( Expression, Expression ) -> Test
+        toTest ( expression, expected ) =
+            test (Lambda.print expression) <|
+                \() ->
+                    expression |> Lambda.eval |> Expect.equal expected
+    in
+    describe "eval"
+        [ describe "reduces an expression as expected" <|
+            List.map toTest
+                [ ( ap (fn 'x' (n 'x')) (n 'y')
+                  , n 'y'
+                  )
+                , ( ap (fn 'x' (fn 'y' (ap (n 'x') (n 'y')))) (n 'y')
+                  , fn 'a' (ap (n 'y') (n 'a'))
+                  )
+                , ( ap
+                        (fn 'x' (fn 'y' (ap (n 'x') (fn 'x' (ap (n 'x') (n 'y'))))))
+                        (n 'y')
+                  , fn 'a' (ap (n 'y') (fn 'x' (ap (n 'x') (n 'a'))))
+                  )
+                ]
+        , describe "reduces in normal order" <|
+            List.map toTest
+                [ ( ap
+                        (fn 'x' (n 'y'))
+                        (ap (fn 'x' (ap (n 'x') (n 'x'))) (fn 'x' (ap (n 'x') (n 'x'))))
+                  , n 'y'
+                  )
+                ]
+        ]
 
 
 test_print : Test
@@ -50,7 +62,7 @@ test_print =
                 \() ->
                     expression |> Lambda.print |> Expect.equal expected
     in
-    describe "print" <|
+    describe "print"
         [ describe "prints names and functions" <|
             List.map toTest
                 [ ( n 'x'
@@ -60,7 +72,7 @@ test_print =
                   , "\\x.x"
                   )
                 ]
-        , describe "uses parentheses to disambiguate" <|
+        , describe "uses parentheses to disambiguate"
             [ describe "function application" <|
                 List.map toTest
                     [ ( fn 'x' (ap (n 'x') (n 'y'))
@@ -99,7 +111,7 @@ test_print =
                       )
                     ]
             ]
-        , describe "abbreviates a sequence of functions as a single 'multi-argument' function" <|
+        , describe "abbreviates a sequence of functions as a single uncurried function" <|
             List.map toTest
                 [ ( fn 'x' (fn 'y' (n 'x'))
                   , "\\xy.x"
@@ -121,7 +133,7 @@ test_parseExpression =
                     expression |> Lambda.print |> Parser.run Lambda.parseExpression |> Expect.equal (Ok expression)
     in
     describe "parseExpression"
-        [ describe "converts a printed Expression back to its original form" <|
+        [ describe "converts a printed expression back to its original form" <|
             List.map toTest
                 [ n 'x'
                 , fn 'x' (n 'x')
